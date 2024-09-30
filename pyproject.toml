@@ -10,6 +10,7 @@ packages = [{include = "hippunfold_train_finetune"}]
 python = ">=3.9,<4.0"
 snakemake = "^7.30.1"
 nnunetv2 = "^2.1"
+nnunet = "^1.7.1"
 
 
 [build-system]
