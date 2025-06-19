@@ -7,12 +7,6 @@ wildcard_constraints:
     subject='[a-zA-Z0-9]+',
     i='[0-9]+'
 
-def get_zip_file(wildcards):
-    """ assuming we have zipfiles named as:  sub-{subject}_<...>.zip, 
-        e.g.  diffparc.zip 
-    """
-    return config['in_zip'][wildcards.app]
-
 
 (subjects,hemis)= glob_wildcards(config['hippunfold_lbl'])
 
@@ -26,7 +20,7 @@ localrules: cp_training_img,cp_training_lbl,plan_preprocess,create_dataset_json
 
 rule all_train:
     input:
-       expand('trained_models/nnUNet/{arch}/{task}/{trainer}__{plans}/fold_{fold}.round_{i}.DONE',fold=range(5), arch=config['architecture'], task=config['task'], trainer=config['trainer'],plans=config['plans'],i=0)
+       expand('trained_models/nnUNet/{arch}/{task}/{trainer}__{plans}/fold_{fold}.round_{i}.DONE',fold=range(5), arch=config['architecture'], task=config['task'], trainer=config['trainer'],plans=config['plans'],i=1)
 
  
 rule all_model_tar:
@@ -39,51 +33,36 @@ rule all_predict:
     input:
         testing_imgs = expand('raw_data/nnUNet_predictions/nnUNet/{arch}/{task}/{trainer}__{plans}/hcp_{subject}{hemi}.nii.gz',subject=testing_subjects, hemi=hemis, arch=config['architecture'], task=config['task'], trainer=config['trainer'],plans=config['plans'],allow_missing=True),
  
-
-rule get_from_zip:
-    """ This is a generic rule to make any file within the {app} subfolder, 
-        by unzipping it from a corresponding zip file"""
-    input:
-        zip=get_zip_file
-    output:
-        '{app}/{file}' # you could add temp() around this to extract on the fly and not store it
-    shell:
-        'unzip -d {wildcards.app} {input.zip} {wildcards.file}'
-
- 
-
+       
 rule cp_training_img:
     input: 
-        nii = 'hippunfold/work/sub-{subject}/anat/sub-{subject}_hemi-{hemi}_space-corobl_desc-preproc_T1w.nii.gz',
-    output: 'raw_data/nnUNet_raw_data/{task}/imagesTr/dhcp_{subject}{hemi}_0000.nii.gz'
-    threads: 32 #to make it serial on a node
+        nii = config['hippunfold_img']
+    output: 'raw_data/nnUNet_raw_data/{task}/imagesTr/hcp_{subject}{hemi}_0000.nii.gz'
     group: 'preproc'
     shell: 'cp {input} {output}'
 
 rule cp_testing_img:
     input: 
-        nii = 'hippunfold/work/sub-{subject}/anat/sub-{subject}_hemi-{hemi}_space-corobl_desc-preproc_T1w.nii.gz',
-    output: 'raw_data/nnUNet_raw_data/{task}/imagesTs/dhcp_{subject}{hemi}_0000.nii.gz'
+        nii = config['hippunfold_img']
+    output:  'raw_data/nnUNet_raw_data/{task}/imagesTs/hcp_{subject}{hemi}_0000.nii.gz'
     group: 'preproc'
-    threads: 32 #to make it serial on a node
     shell: 'cp {input} {output}'
 
 
 rule cp_training_lbl:
     input:
         nii = config['hippunfold_lbl']
-    output: 'raw_data/nnUNet_raw_data/{task}/labelsTr/dhcp_{subject}{hemi}.nii.gz'
+    output: 'raw_data/nnUNet_raw_data/{task}/labelsTr/hcp_{subject}{hemi}.nii.gz'
     group: 'preproc'
-    threads: 32 #to make it serial on a node
     shell: 'cp {input} {output}'
 
 
 rule create_dataset_json:
     input: 
-        training_imgs = expand('raw_data/nnUNet_raw_data/{task}/imagesTr/dhcp_{subject}{hemi}_0000.nii.gz',zip,subject=training_subjects, hemi=hemis,allow_missing=True),
-        training_lbls = expand('raw_data/nnUNet_raw_data/{task}/labelsTr/dhcp_{subject}{hemi}.nii.gz',zip,subject=training_subjects, hemi=hemis,allow_missing=True),
+        training_imgs = expand('raw_data/nnUNet_raw_data/{task}/imagesTr/hcp_{subject}{hemi}_0000.nii.gz',zip,subject=training_subjects, hemi=hemis,allow_missing=True),
+        training_lbls = expand('raw_data/nnUNet_raw_data/{task}/labelsTr/hcp_{subject}{hemi}.nii.gz',zip,subject=training_subjects, hemi=hemis,allow_missing=True),
     params:
-        training_imgs_nosuffix = expand('raw_data/nnUNet_raw_data/{task}/imagesTr/dhcp_{subject}{hemi}.nii.gz',zip,subject=training_subjects, hemi=hemis,allow_missing=True),
+        training_imgs_nosuffix = expand('raw_data/nnUNet_raw_data/{task}/imagesTr/hcp_{subject}{hemi}.nii.gz',zip,subject=training_subjects, hemi=hemis,allow_missing=True),
     output: 
         dataset_json = 'raw_data/nnUNet_raw_data/{task}/dataset.json'
     group: 'preproc'
@@ -105,20 +84,18 @@ rule plan_preprocess:
         dataset_json = 'preprocessed/{task}/dataset.json'
     group: 'preproc'
     resources:
-        threads = 8,
+        threads = 32,
         mem_mb = 16000
     shell:
         '{params.nnunet_env_cmd} && '
-        'nnUNet_plan_and_preprocess  -t {params.task_num} --verify_dataset_integrity'
+        'nnUNet_plan_and_preprocess  -t {params.task_num}' # --verify_dataset_integrity'
 
 rule train_fold_init_round:
     input:
         dataset_json = 'preprocessed/{task}/dataset.json'
     params:
-        nnunet_env_cmd = get_nnunet_env_tmp,
-        rsync_to_tmp = f"rsync -av {config['nnunet_env']['nnUNet_preprocessed']} $TMPDIR",
+        nnunet_env_cmd = get_nnunet_env,
         output_dir = 'trained_models/nnUNet/{arch}/{task}/{trainer}__{plans}/fold_{fold}',
-        timeout = lambda wildcards, resources: '{timeout}m'.format(timeout=(resources.time - 10))
     output:
         training_done = 'trained_models/nnUNet/{arch}/{task}/{trainer}__{plans}/fold_{fold}.round_0.DONE'
     threads: 16
@@ -128,10 +105,8 @@ rule train_fold_init_round:
         time = 4320,
     shell:
         '{params.nnunet_env_cmd} && '
-        '{params.rsync_to_tmp} && '
         'touch {output} && '
         'set +e; '
-        'timeout {params.timeout} '
         'nnUNet_train  {wildcards.arch} {wildcards.trainer} {wildcards.task} {wildcards.fold}'
         ' || true'
 
@@ -142,10 +117,8 @@ rule train_fold_round_i:
         dataset_json = 'preprocessed/{task}/dataset.json',
         training_done = lambda wildcards: 'trained_models/nnUNet/{arch}/{task}/{trainer}__{plans}/fold_{fold}.round_{i}.DONE'.format(task=wildcards.task,trainer=wildcards.trainer,plans=wildcards.plans,arch=wildcards.arch, fold=wildcards.fold, i=int(wildcards.i)-1)
     params:
-        nnunet_env_cmd = get_nnunet_env_tmp,
-        rsync_to_tmp = f"rsync -av {config['nnunet_env']['nnUNet_preprocessed']} $TMPDIR",
+        nnunet_env_cmd = get_nnunet_env,
         output_dir = 'trained_models/nnUNet/{arch}/{task}/{trainer}__{plans}/fold_{fold}',
-        timeout = lambda wildcards, resources: '{timeout}m'.format(timeout=(resources.time - 10))
     output:
         training_done = 'trained_models/nnUNet/{arch}/{task}/{trainer}__{plans}/fold_{fold}.round_{i}.DONE'
     threads: 16
@@ -155,10 +128,9 @@ rule train_fold_round_i:
         time = 4320,
     shell:
         '{params.nnunet_env_cmd} && '
-        '{params.rsync_to_tmp} && '
         'touch {output} && '
         'set +e; '
-        'timeout {params.timeout} nnUNet_train --continue_training  {wildcards.arch} {wildcards.trainer} {wildcards.task} {wildcards.fold}'
+        'nnUNet_train --continue_training  {wildcards.arch} {wildcards.trainer} {wildcards.task} {wildcards.fold}'
         ' || true'
 
 

@@ -1,17 +1,11 @@
 
-
-in_zip: 
-  hippunfold: '/project/6050199/akhanf/ext-bids/developing_human_connectome/hippunfold_training/derivatives/hippunfold_v1.2.1_synthseg_dHCP_neonatal.zip'
-
-
-
-#get desc-nnunet_dseg.nii.gz images from hippunfold as lbl, and T1w as input img
-hippunfold_lbl: '/project/6050199/akhanf/ext-bids/developing_human_connectome/hippunfold_training/derivatives/neonate_dseg_manually_corrected/sub-{subject}_hemi-{hemi}_space-corobl_desc-postproc_dseg.nii.gz'
-
+#hippunfold_training_data is extracted from zenodo zipfiles
+hippunfold_lbl: /localScratch/akhan488/hcp_hippunfold_training/training_data/lbl/{subject}_hemi-{hemi}_lbl.nii.gz
+hippunfold_img: /localScratch/akhan488/hcp_hippunfold_training/training_data/T1w/{subject}_hemi-{hemi}_T1w.nii.gz
 
 dataset_json:
-  name: HippDHCP
-  description: dHCP manually-corrected dataset for hippunfold
+  name: HippT1w
+  description: Zenodo HCP dataset for training hippunfold
   reference: Western University
   license: CC-BY-SA 4.0
   release: 0.1
@@ -36,8 +30,8 @@ dataset_json:
 
 
 out_resolution: '128x256x128'
-task: Task301_dhcp_T1w_synthseg_manuallycorrected
-trainer: nnUNetTrainer
+task: Task301_hcp_T1w
+trainer: nnUNetTrainerV2
 plans: nnUNetPlansv2.1
 architecture: 3d_fullres
 checkpoint: checkpoint_best #or checkpoint_final
@@ -46,6 +40,7 @@ nnunet_env:
   nnUNet_raw_data_base: 'raw_data'
   nnUNet_preprocessed: 'preprocessed'
   RESULTS_FOLDER: 'trained_models'
+  nnUNet_n_proc_DA: 16
 
 nnunet_env_tmp:
   nnUNet_raw_data_base: 'raw_data'
