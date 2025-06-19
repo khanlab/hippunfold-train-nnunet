@@ -1,33 +1,46 @@
 
+#hippunfold_training_data is extracted from zenodo zipfiles
+hippunfold_lbl: /localScratch/akhan488/hcp_hippunfold_training/training_data/lbl/{subject}_hemi-{hemi}_lbl.nii.gz
+hippunfold_img: /localScratch/akhan488/hcp_hippunfold_training/training_data/T1w/{subject}_hemi-{hemi}_T1w.nii.gz
 
-#get desc-nnunet_dseg.nii.gz images from hippunfold as lbl, and T1w as input img
-hippunfold_img: '../hippunfold_T1w_model-b1000_newatlas/work/sub-{subject}/anat/sub-{subject}_hemi-L_space-corobl_desc-cropped_T1w.nii.gz'
-hippunfold_lbl: '../hippunfold_T1w_model-b1000_newatlas/work/sub-{subject}/seg_T1w/sub-{subject}_hemi-L_space-corobl_desc-nnunet_dseg.nii.gz'
-
-training_subjects: 'subjects.tsv' 
-
-hemis:
-  - L 
-
-
-
-
-pretrained_model: '/scratch/akhanf/1_dev/retrain_nnunet/trained_models/nnUNet/3d_fullres/Task104_hcp1200_b1000/nnUNetTrainerV2__nnUNetPlansv2.1/fold_0/model_best.model'
-
-
-
+dataset_json:
+  name: HippT1w
+  description: Zenodo HCP dataset for training hippunfold
+  reference: Western University
+  license: CC-BY-SA 4.0
+  release: 0.1
+  tensorImageSize: 3D
+  modality:
+    '0': T1
+  labels:
+   "0": "background"
+   "1": "GM"
+   "2": "SRLM"
+   "3": "MTLC"
+   "4": "Pial"
+   "5": "HATA"
+   "6": "IndGris"
+   "7": "Cyst"
+   "8": "DG"
+  numTraining: 0
+  numTest: 0
+  training: []
+  test: []
+  
 
 
 out_resolution: '128x256x128'
-task: Task204_hcp1200_b1000_finetune_dhcp_T1w #must be Task###_name where ### is >= 100
+task: Task301_hcp_T1w
 trainer: nnUNetTrainerV2
+plans: nnUNetPlansv2.1
 architecture: 3d_fullres
-checkpoint: model_best
+checkpoint: checkpoint_best #or checkpoint_final
 
 nnunet_env:
   nnUNet_raw_data_base: 'raw_data'
   nnUNet_preprocessed: 'preprocessed'
   RESULTS_FOLDER: 'trained_models'
+  nnUNet_n_proc_DA: 16
 
 nnunet_env_tmp:
   nnUNet_raw_data_base: 'raw_data'
